@@ -170,11 +170,11 @@
     var src = ctx.createBufferSource();
     src.buffer = this.buffer(midi, mode);
     if (slide) {
-      // nota inicial = buffer da nota final reduzido de velocidade; desliza rápido até a altura final
-      var glide = Math.max(0.06, Math.min(0.15, slide.dt * 0.3)), r0 = Math.pow(2, (slide.from - midi) / 12);
+      // começa na altura da nota anterior e desliza rápido até a nota final
+      var hold = slide.hold || 0.03, glide = slide.glide || 0.1, r0 = Math.pow(2, (slide.from - midi) / 12);
       src.playbackRate.setValueAtTime(r0, when);
-      src.playbackRate.setValueAtTime(r0, when + Math.max(0.01, slide.dt - glide));
-      src.playbackRate.exponentialRampToValueAtTime(1, when + slide.dt);
+      src.playbackRate.setValueAtTime(r0, when + hold);
+      src.playbackRate.exponentialRampToValueAtTime(1, when + hold + glide);
     }
     var g = ctx.createGain();
     g.gain.value = Math.max(0.05, Math.min(1.2, vel));
@@ -275,15 +275,6 @@
       sec += len;
     });
     tl.sort(function (a, b) { return a.sec - b.sec; });
-    // slides: a nota inicial soa deslizando até a final; a final não é re-tocada
-    var byKey = {};
-    tl.forEach(function (it) { if (it.e.id != null) byKey[it.pass + '_' + it.e.id] = it; });
-    tl.forEach(function (it) {
-      if (it.e.tech === 's' && it.e.from) {
-        var p0 = byKey[it.pass + '_' + it.e.from.id];
-        if (p0) { p0.slide = { to: it.e.midi, dt: it.sec - p0.sec }; it.skip = true; }
-      }
-    });
     stl.sort(function (a, b) { return a.sec - b.sec; });
     this.timeline = tl; this.states = stl; this.passes = passes; this.total = sec + 1.2;
     this.nextIdx = 0; this.songSec = 0;
@@ -340,11 +331,15 @@
       var it = tl[this.nextIdx++];
       var when = this.anchorCtx + (it.sec - this.anchorSong) / this.rate;
       if (when < ctx.currentTime - 0.01) continue;
-      var e = it.e, w0 = Math.max(when, ctx.currentTime);
-      if (it.skip) continue;
-      if (e.tech === 'h') this.synth.pluck(e.midi, w0, e.vel * this.vol, e.s, 'soft');
-      else if (it.slide) this.synth.pluck(it.slide.to, w0, e.vel * this.vol, e.s, undefined, { from: e.midi, dt: it.slide.dt / this.rate });
-      else this.synth.pluck(e.midi, w0, e.vel * this.vol, e.s);
+      var e = it.e, w0 = Math.max(when, ctx.currentTime), v = e.vel * this.vol;
+      if (e.tech === 'h' && e.from) {
+        // hammer-on: re-toca a nota anterior por um instante (~40 ms) e já "martela" a nota final
+        this.synth.pluck(e.from.midi, w0, v * 0.75, e.s);
+        this.synth.pluck(e.midi, w0 + 0.04, v, e.s, 'soft');
+      } else if (e.tech === 's' && e.from) {
+        // slide: re-toca a nota anterior e desliza rapidamente até a final
+        this.synth.pluck(e.midi, w0, v, e.s, undefined, { from: e.from.midi, hold: 0.03, glide: 0.1 });
+      } else this.synth.pluck(e.midi, w0, v, e.s);
     }
     if (now >= this.total) { this.stop(true); if (this.onEnd) this.onEnd(); }
   };

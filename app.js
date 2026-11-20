@@ -126,7 +126,7 @@
     var st = null, lo = 0, hi = pl.states.length - 1, mid;
     while (lo <= hi) { mid = (lo + hi) >> 1; if (pl.states[mid].sec <= sec + 0.005) { st = pl.states[mid]; lo = mid + 1; } else hi = mid - 1; }
     var plucks = [], i0 = pl.findIdx(sec - 1.6), tl = pl.timeline;
-    for (var i = i0; i < tl.length && tl[i].sec <= sec + 0.001; i++) if (!tl[i].e.tech || tl[i].slide) plucks.push({ s: tl[i].e.s, f: tl[i].e.f, hand: tl[i].e.hand, age: sec - tl[i].sec });
+    for (var i = i0; i < tl.length && tl[i].sec <= sec + 0.001; i++) plucks.push({ s: tl[i].e.s, f: tl[i].e.f, hand: tl[i].e.hand, age: sec - tl[i].sec });
     c.guitar.frame(st ? st.s : null, plucks, sec);
   }
 

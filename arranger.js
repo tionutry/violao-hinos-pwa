@@ -513,9 +513,9 @@
   }
 
   /* ---------- técnicas da melodia: hammer-on (h) e slide (s) ---------- */
-  // b.tech = 'h'|'s'; b.from = nota anterior (mesma corda, ligada). b não é re-tocada pela mão direita.
+  // b.tech = 'h'|'s' (ornamento na nota de chegada b): re-toca a nota anterior (b.from) por um instante e liga/desliza até b.
   function markTech(arr) {
-    var ev = arr.events, info = arr.minfo, states = arr.states, i, last = -9;
+    var ev = arr.events, info = arr.minfo, states = arr.states, i, last = -9, flip = 0;
     ev.forEach(function (e, k) { e.id = k; delete e.tech; delete e.from; });
     var mels = ev.filter(function (e) { return e.role === 'mel'; });
     function mOf(t) {
@@ -529,11 +529,11 @@
       if (a.hard || b.hard || a.s !== b.s || b.f <= a.f || b.midi <= a.midi) continue;
       if (Math.abs(a.t + a.d - b.t) > 1 || mOf(a.t) !== mOf(b.t)) continue;
       var diff = b.f - a.f;
-      if (diff > 4 || b.d < 48 || a.d < 24 || !(b.fing > 0)) continue;
+      if (diff > 4 || b.d < 48 || !(b.fing > 0)) continue;
       var tech = null;
-      if (a.f >= 1 && a.fing > 0 && a.d <= 48) tech = 's';
-      else if (a.f === 0 && diff <= 3) tech = 'h';
-      else if (a.f >= 1 && a.d > 48 && diff <= 2) tech = 'h';
+      // grave (nota anterior) -> chegada: corda solta => hammer-on; casa => slide ou hammer (alternando)
+      if (a.f === 0 && diff <= 3) tech = 'h';
+      else if (a.f >= 1 && a.fing > 0) tech = diff >= 3 ? 's' : (flip++ % 2 ? 's' : 'h');
       if (!tech) continue;
       if (tech === 's') {
         // o mesmo dedo desliza: não pode haver outro dedo da forma do acorde usando esse número
@@ -549,7 +549,7 @@
           b.fing = a.fing;
         }
       }
-      b.tech = tech; b.from = a; b.vel = tech === 'h' ? 0.8 : 0.9;
+      b.tech = tech; b.from = a;
       last = i;
     }
     return arr;

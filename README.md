@@ -9,7 +9,7 @@ Aplicativo instalável (PWA) para **executar os 480 hinos do Hinário nº 5 em v
   - Arranjo automático: **melodia** (soprano) + **baixo com o polegar (p) nas tônicas** de cada acorde + **dedilhado** com as demais notas do acorde até a próxima mudança.
   - O tom é transposto automaticamente para as posições mais fáceis do violão (dá para mudar com − / + ou escolher "Original com capotraste" nas configurações).
 - **Duas vozes/aparências de violão**: **náilon** (clássico, madeira clara, som quente) e **aço** (folk, sunburst escuro, som brilhante). O som é sintetizado no próprio aparelho (nenhum arquivo de áudio).
-- **Técnicas na melodia**: o arranjo inclui **hammer-on (H)** e **slide (sl)** em trechos adequados (marcados na tablatura); a nota ligada não é palhetada de novo.
+- **Técnicas na melodia**: o arranjo inclui **hammer-on (H)** e **slide (sl)** em trechos adequados (marcados na tablatura); a nota de chegada recebe um adorno rápido (nota anterior re-tocada + hammer ou slide).
 - **Modo vídeo** (botão ⛶): esconde as barras e deixa só a partitura 16:9 + violão, para gravar a tela.
 
 ## Como publicar no GitHub Pages (pelo celular)
