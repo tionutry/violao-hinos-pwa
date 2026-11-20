@@ -549,16 +549,28 @@
         if (stt) stt.held.forEach(function (hh) { if (hh.s === e.s && hh.f === e.f) fn = hh.n; });
         if (fn > 0) el('text', { x: x + fw / 2 - 1, y: y - 8, 'font-family': SANS, 'font-size': 15, 'font-weight': 'bold', fill: '#2a5f8a' }, gcol, '' + fn);
       }
-      // dedo da mão direita
+      // hammer-on / slide: ligadura na tablatura
+      if (e.tech && e.from && cx[Math.round(e.from.t)] != null) {
+        var x0 = cx[Math.round(e.from.t)], fw0 = textW('' + e.from.f, 'bold 27px ' + SANS) + 10;
+        var xa = x0 + fw0 / 2 + 2, xb = x - fw / 2 - 2;
+        if (e.tech === 'h') {
+          el('path', { d: 'M' + xa + ',' + (y - 17) + ' Q' + ((xa + xb) / 2) + ',' + (y - 40) + ' ' + xb + ',' + (y - 17), fill: 'none', stroke: ACCENT, 'stroke-width': 3, 'stroke-linecap': 'round' }, gcol);
+          el('text', { x: (xa + xb) / 2, y: y - 40, 'text-anchor': 'middle', 'font-family': SANS, 'font-size': 17, 'font-weight': 'bold', fill: ACCENT }, gcol, 'H');
+        } else {
+          el('line', { x1: xa, y1: y + 9, x2: xb, y2: y - 9, stroke: ACCENT, 'stroke-width': 3.5, 'stroke-linecap': 'round' }, gcol);
+          el('text', { x: (xa + xb) / 2, y: y - 18, 'text-anchor': 'middle', 'font-family': SANS, 'font-size': 17, 'font-weight': 'bold', fill: ACCENT }, gcol, 'sl');
+        }
+      }
+      // dedo da mão direita (não há palhetada na nota ligada)
       var row = e.hand === 'p' ? 1 : 0;
-      el('text', { x: x, y: fRowY + row * 36, 'text-anchor': 'middle', 'font-family': SERIF, 'font-style': 'italic', 'font-size': 34, 'font-weight': 'bold', fill: FINGER_COL[e.hand] }, gcol, e.hand);
+      if (!e.tech) el('text', { x: x, y: fRowY + row * 36, 'text-anchor': 'middle', 'font-family': SERIF, 'font-style': 'italic', 'font-size': 34, 'font-weight': 'bold', fill: FINGER_COL[e.hand] }, gcol, e.hand);
     });
     // legenda
     el('text', { x: tabL, y: fRowY + 40, 'font-family': SANS, 'font-size': 20, fill: INK2, opacity: 0 }, tab, '');
 
     // rodapé
     var ft = el('g', { 'class': 'foot' }, svg);
-    el('text', { x: 72, y: 1052, 'font-family': SANS, 'font-size': 20, fill: INK2 }, ft, 'DigitaHinos · Hinário nº 5 · arranjo fingerstyle  —  números azuis: dedos da mão esquerda · p i m a: mão direita');
+    el('text', { x: 72, y: 1052, 'font-family': SANS, 'font-size': 20, fill: INK2 }, ft, 'DigitaHinos · Hinário nº 5 · arranjo fingerstyle  —  números azuis: dedos da mão esquerda · p i m a: mão direita · H = hammer-on · sl = slide');
     el('text', { x: W - 72, y: 1052, 'text-anchor': 'end', 'font-family': SANS, 'font-size': 20, fill: INK2 }, ft, 'Página ' + (pageIndex + 1));
 
     // cabeça de reprodução

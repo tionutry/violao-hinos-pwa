@@ -512,6 +512,49 @@
     };
   }
 
+  /* ---------- técnicas da melodia: hammer-on (h) e slide (s) ---------- */
+  // b.tech = 'h'|'s'; b.from = nota anterior (mesma corda, ligada). b não é re-tocada pela mão direita.
+  function markTech(arr) {
+    var ev = arr.events, info = arr.minfo, states = arr.states, i, last = -9;
+    ev.forEach(function (e, k) { e.id = k; delete e.tech; delete e.from; });
+    var mels = ev.filter(function (e) { return e.role === 'mel'; });
+    function mOf(t) {
+      var lo = 0, hi = info.length - 1;
+      while (lo < hi) { var mid = (lo + hi + 1) >> 1; if (info[mid].t0 <= t + 0.5) lo = mid; else hi = mid - 1; }
+      return lo;
+    }
+    for (i = 0; i + 1 < mels.length; i++) {
+      var a = mels[i], b = mels[i + 1];
+      if (i < last + 2) continue;
+      if (a.hard || b.hard || a.s !== b.s || b.f <= a.f || b.midi <= a.midi) continue;
+      if (Math.abs(a.t + a.d - b.t) > 1 || mOf(a.t) !== mOf(b.t)) continue;
+      var diff = b.f - a.f;
+      if (diff > 4 || b.d < 48 || a.d < 24 || !(b.fing > 0)) continue;
+      var tech = null;
+      if (a.f >= 1 && a.fing > 0 && a.d <= 48) tech = 's';
+      else if (a.f === 0 && diff <= 3) tech = 'h';
+      else if (a.f >= 1 && a.d > 48 && diff <= 2) tech = 'h';
+      if (!tech) continue;
+      if (tech === 's') {
+        // o mesmo dedo desliza: não pode haver outro dedo da forma do acorde usando esse número
+        var ok = true;
+        states.forEach(function (st) {
+          if (st.t >= b.t - 0.5 && st.t < b.t + b.d - 0.5) st.held.forEach(function (h) { if (!h.mel && h.n === a.fing) ok = false; });
+        });
+        if (!ok) { if (diff <= 3) tech = 'h'; else continue; }
+        else {
+          states.forEach(function (st) {
+            if (st.t >= b.t - 0.5 && st.t < b.t + b.d - 0.5) st.held.forEach(function (h) { if (h.mel && h.s === b.s && h.f === b.f) h.n = a.fing; });
+          });
+          b.fing = a.fing;
+        }
+      }
+      b.tech = tech; b.from = a; b.vel = tech === 'h' ? 0.8 : 0.9;
+      last = i;
+    }
+    return arr;
+  }
+
   /* ---------- seleção automática de tom ---------- */
   function arrange(h, opts) {
     opts = opts || {};
@@ -541,12 +584,13 @@
     });
     best.keyName = pcName(mod(h.k * 7 + best.T, 12), best.fifths) + (h.md ? 'm' : '');
     best.density = density;
+    markTech(best);
     return best;
   }
 
   return {
     Q: Q, OPEN: OPEN, QUAL: QUAL, arrange: arrange, arrangeFor: arrangeFor,
     chordName: chordName, pcName: pcName, fifthsFromPc: fifthsFromPc, measureInfo: measureInfo,
-    assignFingers: assignFingers, melodyFinger: melodyFinger, buildShapes: buildShapes
+    markTech: markTech, assignFingers: assignFingers, melodyFinger: melodyFinger, buildShapes: buildShapes
   };
 });

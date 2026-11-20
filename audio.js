@@ -8,7 +8,7 @@
   'use strict';
 
   var VOICES = {
-    nylon: { t60ref: 1.9, gamma: 0.55, t60min: 0.55, t60max: 4.2, S: 0.5, exFc: 2300, beta: 0.16, pre: 0.0, gain: 0.95, click: 0.0 },
+    nylon: { t60ref: 3.3, gamma: 0.42, t60min: 1.0, t60max: 6.0, S: 0.5, exFc: 2300, beta: 0.16, pre: 0.0, gain: 0.95, click: 0.0 },
     aco: { t60ref: 3.4, gamma: 0.5, t60min: 1.0, t60max: 6.5, S: 0.3, exFc: 7500, beta: 0.12, pre: 0.0, gain: 0.8, click: 0.18 }
   };
 
@@ -20,8 +20,10 @@
     return function () { s = (s * 1664525 + 1013904223) >>> 0; return (s / 4294967296) * 2 - 1; };
   }
 
-  function renderPluck(sr, midi, voice, vel) {
+  function renderPluck(sr, midi, voice, vel, mode) {
     var p = VOICES[voice] || VOICES.nylon;
+    var soft = mode === 'soft'; // hammer-on: ataque suave, sem unha
+    if (soft) { p = Object.assign({}, p); p.exFc = p.exFc * 0.5; p.click = 0; p.gain = p.gain * 0.85; }
     var f = mtof(midi);
     var t60 = Math.max(p.t60min, Math.min(p.t60max, p.t60ref * Math.pow(220 / f, p.gamma)));
     var dur = Math.min(t60 * 1.05 + 0.25, p.t60max + 0.5);
@@ -56,7 +58,7 @@
     for (i = 0; i < N; i++) buf[i] = tmp[i] / (mx || 1);
 
     var ptr = 0, x1 = 0, ap1 = 0, zprev = 0;
-    var att = Math.floor(sr * 0.0015);
+    var att = Math.floor(sr * (soft ? 0.007 : 0.0015));
     for (i = 0; i < n; i++) {
       var x = buf[ptr];
       var y = rho * ((1 - S) * x + S * x1);
@@ -75,6 +77,11 @@
     if (p.click > 0) {
       var r2 = rng(midi * 31 + 5), c1 = 0, cl = Math.floor(sr * 0.012);
       for (i = 0; i < cl && i < n; i++) { c1 = 0.55 * c1 + 0.45 * r2(); out[i] += p.click * c1 * Math.pow(1 - i / cl, 2); }
+    }
+    // batida do dedo na casa (hammer-on): baque grave curtíssimo
+    if (soft) {
+      var r3 = rng(midi * 17 + 9), t1 = 0, tl2 = Math.floor(sr * 0.03);
+      for (i = 0; i < tl2 && i < n; i++) { t1 = 0.93 * t1 + 0.07 * r3(); out[i] += 0.9 * t1 * Math.pow(1 - i / tl2, 2) * 6; }
     }
     // normaliza (RMS dos primeiros 200ms)
     var w = Math.min(n, Math.floor(sr * 0.2)), e = 0;
@@ -119,7 +126,7 @@
     this.comp = ctx.createDynamicsCompressor();
     this.comp.threshold.value = -16; this.comp.knee.value = 18; this.comp.ratio.value = 3; this.comp.attack.value = 0.005; this.comp.release.value = 0.25;
     this.master = ctx.createGain(); this.master.gain.value = 0.9;
-    this.rev = ctx.createConvolver(); this.rev.buffer = makeImpulse(ctx, 1.4, 2.6);
+    this.rev = ctx.createConvolver(); this.irs = { aco: makeImpulse(ctx, 1.4, 2.6), nylon: makeImpulse(ctx, 2.6, 2.0) }; this.rev.buffer = this.irs.aco;
     this.wet = ctx.createGain(); this.dry = ctx.createGain();
     this.bus.connect(this.f1); this.f1.connect(this.f2); this.f2.connect(this.f3); this.f3.connect(this.comp);
     this.comp.connect(this.dry); this.comp.connect(this.rev); this.rev.connect(this.wet);
@@ -129,6 +136,7 @@
   Synth.prototype.setVoice = function (v) {
     this.voice = v;
     if (!this.ctx) return;
+    this.rev.buffer = this.irs[v === 'aco' ? 'aco' : 'nylon'];
     if (v === 'aco') {
       this.f1.frequency.value = 110; this.f1.gain.value = 3.5; this.f1.Q.value = 1.1;
       this.f2.frequency.value = 2600; this.f2.gain.value = 2.5; this.f2.Q.value = 0.9;
@@ -138,28 +146,36 @@
       this.f1.frequency.value = 95; this.f1.gain.value = 3.5; this.f1.Q.value = 1.2;
       this.f2.frequency.value = 210; this.f2.gain.value = 2.0; this.f2.Q.value = 1.0;
       this.f3.frequency.value = 4500; this.f3.gain.value = -3.5;
-      this.wet.gain.value = 0.2; this.dry.gain.value = 0.95;
+      this.wet.gain.value = 0.36; this.dry.gain.value = 0.9;
     }
   };
-  Synth.prototype.buffer = function (midi) {
-    var key = this.voice + midi;
+  Synth.prototype.buffer = function (midi, mode) {
+    var key = this.voice + midi + (mode || '');
     var b = this.cache[key];
     if (b) return b;
-    var data = renderPluck(this.ctx.sampleRate, midi, this.voice, 1);
+    var data = renderPluck(this.ctx.sampleRate, midi, this.voice, 1, mode);
     b = this.ctx.createBuffer(1, data.length, this.ctx.sampleRate);
     b.copyToChannel(data, 0);
     this.cache[key] = b;
     return b;
   };
-  Synth.prototype.prepare = function (midis) {
+  Synth.prototype.prepare = function (midis, mode) {
     var seen = {};
-    for (var i = 0; i < midis.length; i++) if (!seen[midis[i]]) { seen[midis[i]] = 1; this.buffer(midis[i]); }
+    for (var i = 0; i < midis.length; i++) if (!seen[midis[i]]) { seen[midis[i]] = 1; this.buffer(midis[i], mode); }
   };
   // toca uma nota. string = id da corda p/ abafar a anterior
-  Synth.prototype.pluck = function (midi, when, vel, string) {
+  // mode: undefined (palhetada normal) | 'soft' (hammer-on). slide: {from, dt} desliza de 'from' até midi em dt s.
+  Synth.prototype.pluck = function (midi, when, vel, string, mode, slide) {
     var ctx = this.ctx;
     var src = ctx.createBufferSource();
-    src.buffer = this.buffer(midi);
+    src.buffer = this.buffer(midi, mode);
+    if (slide) {
+      // nota inicial = buffer da nota final reduzido de velocidade; desliza rápido até a altura final
+      var glide = Math.max(0.06, Math.min(0.15, slide.dt * 0.3)), r0 = Math.pow(2, (slide.from - midi) / 12);
+      src.playbackRate.setValueAtTime(r0, when);
+      src.playbackRate.setValueAtTime(r0, when + Math.max(0.01, slide.dt - glide));
+      src.playbackRate.exponentialRampToValueAtTime(1, when + slide.dt);
+    }
     var g = ctx.createGain();
     g.gain.value = Math.max(0.05, Math.min(1.2, vel));
     src.connect(g); g.connect(this.bus);
@@ -259,11 +275,21 @@
       sec += len;
     });
     tl.sort(function (a, b) { return a.sec - b.sec; });
+    // slides: a nota inicial soa deslizando até a final; a final não é re-tocada
+    var byKey = {};
+    tl.forEach(function (it) { if (it.e.id != null) byKey[it.pass + '_' + it.e.id] = it; });
+    tl.forEach(function (it) {
+      if (it.e.tech === 's' && it.e.from) {
+        var p0 = byKey[it.pass + '_' + it.e.from.id];
+        if (p0) { p0.slide = { to: it.e.midi, dt: it.sec - p0.sec }; it.skip = true; }
+      }
+    });
     stl.sort(function (a, b) { return a.sec - b.sec; });
     this.timeline = tl; this.states = stl; this.passes = passes; this.total = sec + 1.2;
     this.nextIdx = 0; this.songSec = 0;
     var midis = arr.events.map(function (e) { return e.midi; });
     this.midis = midis;
+    this.softMidis = arr.events.filter(function (e) { return e.tech === 'h'; }).map(function (e) { return e.midi; });
   };
 
   Player.prototype.passAt = function (sec) {
@@ -295,7 +321,7 @@
   Player.prototype.start = function (fromSec) {
     var s = this.synth; s.init();
     if (s.ctx.state === 'suspended') s.ctx.resume();
-    s.prepare(this.midis || []);
+    s.prepare(this.midis || []); s.prepare(this.softMidis || [], 'soft');
     this.songSec = fromSec == null ? this.songSec : fromSec;
     if (this.songSec >= this.total - 1.0) this.songSec = 0;
     this.anchorCtx = s.ctx.currentTime + 0.08; this.anchorSong = this.songSec;
@@ -314,8 +340,11 @@
       var it = tl[this.nextIdx++];
       var when = this.anchorCtx + (it.sec - this.anchorSong) / this.rate;
       if (when < ctx.currentTime - 0.01) continue;
-      var e = it.e;
-      this.synth.pluck(e.midi, Math.max(when, ctx.currentTime), e.vel * this.vol, e.s);
+      var e = it.e, w0 = Math.max(when, ctx.currentTime);
+      if (it.skip) continue;
+      if (e.tech === 'h') this.synth.pluck(e.midi, w0, e.vel * this.vol, e.s, 'soft');
+      else if (it.slide) this.synth.pluck(it.slide.to, w0, e.vel * this.vol, e.s, undefined, { from: e.midi, dt: it.slide.dt / this.rate });
+      else this.synth.pluck(e.midi, w0, e.vel * this.vol, e.s);
     }
     if (now >= this.total) { this.stop(true); if (this.onEnd) this.onEnd(); }
   };

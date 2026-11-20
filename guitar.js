@@ -16,9 +16,9 @@
 
   var THEMES = {
     nylon: {
-      panel: '#3a2616', panel2: '#241509', top0: '#f2d394', top1: '#d9a352', top2: '#a8702c', edge: '#6b3f17', bind: '#f4e6c2',
-      board: '#1d120b', fret: '#e1dccf', nut: '#f3ead2', inlay: '#e6d9b8', trebleStr: '#f3eedd', woundStr: '#d2b878',
-      hole: '#1a0f08', ring: '#6b3a16', bridge: '#2a1a10', head: '#2b1a10', label: '#f6ecd2', accent: '#f0c060', peg: '#e8dcb8', guard: null
+      panel: '#0b1424', panel2: '#03060c', top0: '#7cc2ff', top1: '#1c52a8', top2: '#04070f', edge: '#02040a', bind: '#e9d9b4',
+      board: '#0a0a0c', fret: '#e1dccf', nut: '#f3ead2', inlay: '#e6d9b8', trebleStr: '#f3eedd', woundStr: '#d2b878',
+      hole: '#02040a', ring: '#0f2a5c', bridge: '#0b0f18', head: '#0b0f18', label: '#f6ecd2', accent: '#f0c060', peg: '#e9d9b4', guard: null
     },
     aco: {
       panel: '#0f1a26', panel2: '#070d14', top0: '#f2b650', top1: '#b8561d', top2: '#2e0f06', edge: '#1a0803', bind: '#f7f0df',
