@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Violão dos Hinos — DigitaHinos</title>
+<meta name="description" content="Execução dos 480 hinos em violão fingerstyle: partitura, letra, acordes, tablatura e violão animado.">
+<meta name="theme-color" content="#3a2616">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Violão Hinos">
+<link rel="stylesheet" href="app.css">
+</head>
+<body data-voice="nylon">
+
+<!-- TELA PRINCIPAL -->
+<section id="home" class="screen active">
+  <header class="bar">
+    <div class="brand">DigitaHinos</div>
+    <button id="btnSettings" class="icon-btn" aria-label="Configurações" title="Configurações">⚙</button>
+  </header>
+  <main class="home-main">
+    <div class="hero">
+      <svg viewBox="0 0 120 120" class="hero-ico" aria-hidden="true">
+        <circle cx="60" cy="60" r="56" fill="var(--accent)" opacity=".18"/>
+        <path d="M70 18 L96 44 L88 52 L82 46 L58 70 C66 80 64 94 52 100 C40 106 24 100 20 88 C16 76 26 64 38 64 C42 64 46 66 48 68 L72 44 L66 38 Z" fill="var(--ink)"/>
+        <circle cx="44" cy="84" r="9" fill="var(--paper)"/>
+      </svg>
+      <h1>Violão dos Hinos</h1>
+      <p class="sub">Hinário nº 5 · 480 hinos em fingerstyle</p>
+    </div>
+    <button id="btnContinue" class="card-btn" hidden>
+      <span class="small">Continuar</span>
+      <span id="continueTitle" class="big"></span>
+    </button>
+    <p class="hint">Abra <b>⚙ Configurações</b> e toque em <b>Biblioteca de hinos</b> para escolher um hino.</p>
+  </main>
+</section>
+
+<!-- CONFIGURAÇÕES -->
+<section id="settings" class="screen">
+  <header class="bar">
+    <button class="icon-btn back" data-back="home" aria-label="Voltar">‹</button>
+    <div class="title">Configurações</div>
+    <span></span>
+  </header>
+  <main class="scroll">
+    <button id="btnLibrary" class="card-btn primary">
+      <span class="small">Escolher e tocar</span>
+      <span class="big">📖 Biblioteca de hinos (480)</span>
+    </button>
+
+    <h3>Violão</h3>
+    <div class="seg" id="segVoice">
+      <button data-v="nylon"><b>Cordas de náilon</b><small>violão clássico · som quente</small></button>
+      <button data-v="aco"><b>Cordas de aço</b><small>violão folk · som brilhante</small></button>
+    </div>
+
+    <h3>Tom</h3>
+    <select id="selTone">
+      <option value="facil">Fácil — transpor para o tom mais confortável</option>
+      <option value="original">Original — manter o tom (com capotraste)</option>
+    </select>
+
+    <h3>Acompanhamento (dedilhado)</h3>
+    <select id="selDensity">
+      <option value="arpejo">Arpejo (mais notas, fluido)</option>
+      <option value="simples">Simples (uma nota por tempo)</option>
+    </select>
+
+    <h3>Estrofes</h3>
+    <select id="selVerse">
+      <option value="all">Tocar todas as estrofes</option>
+      <option value="1">Só a 1ª estrofe</option>
+    </select>
+
+    <h3>Tablatura</h3>
+    <label class="check"><input type="checkbox" id="chkFingers" checked> Mostrar dedos da mão esquerda (números azuis)</label>
+
+    <h3>Velocidade padrão</h3>
+    <div class="range-row"><input type="range" id="rngSpeed" min="50" max="130" step="5" value="100"><output id="outSpeed">100%</output></div>
+
+    <p class="foot">Instalável como aplicativo (PWA). Funciona offline depois do primeiro acesso.</p>
+  </main>
+</section>
+
+<!-- BIBLIOTECA -->
+<section id="library" class="screen">
+  <header class="bar">
+    <button class="icon-btn back" data-back="settings" aria-label="Voltar">‹</button>
+    <div class="title">Biblioteca de hinos</div>
+    <span></span>
+  </header>
+  <div class="search"><input id="q" type="search" placeholder="Número ou título…" inputmode="search" autocomplete="off"></div>
+  <ul id="list" class="list"></ul>
+</section>
+
+<!-- EXECUÇÃO -->
+<section id="player" class="screen">
+  <header class="bar slim" id="pBar">
+    <button class="icon-btn back" id="pBack" aria-label="Voltar">‹</button>
+    <div class="title" id="pTitle">—</div>
+    <button class="chip" id="btnVoice" title="Trocar violão">Náilon</button>
+  </header>
+  <div id="stage">
+    <div id="sheetWrap"><div id="sheet"></div><div id="loading" class="loading">Preparando…</div></div>
+    <div id="guitarWrap"></div>
+  </div>
+  <footer id="ctrl">
+    <div class="row">
+      <button id="bRestart" class="ctl" aria-label="Início">⏮</button>
+      <button id="bPrev" class="ctl" aria-label="Compasso anterior">◀◀</button>
+      <button id="bPlay" class="ctl big" aria-label="Tocar">▶</button>
+      <button id="bNext" class="ctl" aria-label="Próximo compasso">▶▶</button>
+      <button id="bFull" class="ctl" aria-label="Modo vídeo">⛶</button>
+    </div>
+    <div class="row opts">
+      <label class="mini">Veloc. <input type="range" id="pSpeed" min="50" max="130" step="5" value="100"><output id="pSpeedOut">100%</output></label>
+      <span class="mini tone"><button id="tDown" class="ctl s">−</button><span id="toneLbl">Tom</span><button id="tUp" class="ctl s">+</button></span>
+      <label class="mini">Estrofe <select id="pVerse"></select></label>
+    </div>
+  </footer>
+  <button id="exitClean" class="exit-clean" hidden aria-label="Sair do modo vídeo">✕</button>
+</section>
+
+<script src="vexflow.js"></script>
+<script src="arranger.js"></script>
+<script src="audio.js"></script>
+<script src="sheet.js"></script>
+<script src="guitar.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
