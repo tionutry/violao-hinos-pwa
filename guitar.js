@@ -1,27 +1,36 @@
-/* guitar.js — violão animado (SVG): mão esquerda (dedos 1-4) e mão direita (p i m a)
- * Duas aparências: 'nylon' (clássico, madeira clara) e 'aco' (folk, sunburst escuro).
+/* guitar.js — violão animado (SVG) visto de frente, como se alguém tocasse diante do usuário:
+ * corpo à esquerda, braço para a direita com a cabeça à direita, cordas graves em cima (E A D G B e).
+ * Mão esquerda: dedos 1-4. Mão direita: p i m a. Duas aparências: 'nylon' e 'aco'.
  */
 (function (root) {
   'use strict';
   var NS = 'http://www.w3.org/2000/svg';
   var VW = 1920, VH = 420;
-  var NUT = 190, BRIDGE = 1768;
-  var SY = function (s) { return 210 + (s - 3.5) * 34; };
+  var NUT = 1600, BRIDGE = 150;
   var LF_COL = { 1: '#e2483c', 2: '#2f80d8', 3: '#2fa752', 4: '#e5a21d' };
   var RF_COL = { p: '#c0482a', i: '#2b86b8', m: '#35a24b', a: '#d9a21b' };
+  var LABELS = ['', 'e', 'B', 'G', 'D', 'A', 'E'];
 
   var THEMES = {
     nylon: {
-      panel: '#3a2616', panel2: '#241509', top0: '#f0cf8d', top1: '#d49b4c', top2: '#a8702c', edge: '#7a4a1c',
-      board: '#2b1a10', fret: '#d9d4c7', nut: '#efe6cf', inlay: '#e6d9b8', trebleStr: '#f3eedd', woundStr: '#cfc7a4',
-      hole: '#1a0f08', rosette: ['#6b3a16', '#e9d7a8', '#2a5a7a', '#e9d7a8'], bridge: '#2a1a10', head: '#2b1a10', label: '#f6ecd2', accent: '#f0c060', pins: false
+      panel: '#3a2616', panel2: '#241509', top0: '#f2d394', top1: '#d9a352', top2: '#a8702c', edge: '#6b3f17', bind: '#f4e6c2',
+      board: '#2b1a10', neck: '#8a5a2b', fret: '#e1dccf', nut: '#f3ead2', inlay: '#e6d9b8', trebleStr: '#f3eedd', woundStr: '#d7cfae',
+      hole: '#1a0f08', rosette: ['#6b3a16', '#f0dfae', '#2a5a7a', '#f0dfae'], bridge: '#2a1a10', head: '#2b1a10', label: '#f6ecd2', accent: '#f0c060', peg: '#efe4c4'
     },
     aco: {
-      panel: '#0f1a26', panel2: '#070d14', top0: '#f1b24a', top1: '#b8561d', top2: '#2e0f06', edge: '#1a0803',
-      board: '#12100e', fret: '#c9d3dc', nut: '#e9edf0', inlay: '#e6f0f7', trebleStr: '#e5ebf0', woundStr: '#c68a4a',
-      hole: '#0b0504', rosette: ['#111', '#f2f2f2', '#111'], bridge: '#1c110c', head: '#14100e', label: '#dbe9f5', accent: '#6db6ff', pins: true
+      panel: '#0f1a26', panel2: '#070d14', top0: '#f2b650', top1: '#b8561d', top2: '#2e0f06', edge: '#1a0803', bind: '#f7f0df',
+      board: '#12100e', neck: '#4a2c18', fret: '#cfd8e0', nut: '#eef2f4', inlay: '#e6f0f7', trebleStr: '#e5ebf0', woundStr: '#c68a4a',
+      hole: '#0b0504', rosette: ['#111', '#f2f2f2', '#111'], bridge: '#1c110c', head: '#14100e', label: '#dbe9f5', accent: '#6db6ff', peg: '#c9d3dc'
     }
   };
+
+  /* geometria com perspectiva: u=0 na pestana (longe), u=1 no cavalete (perto) */
+  function U(x) { return (NUT - x) / (NUT - BRIDGE); }
+  function SP(x) { return 22 + 15 * U(x); }
+  function CY(x) { return 188 + 30 * U(x); }
+  function Y(s, x) { return CY(x) + (s - 3.5) * SP(x); } // corda 6 em cima, corda 1 embaixo
+  // s: 1 (aguda) .. 6 (grave) -> y crescente quando s diminui (grave em cima)
+  function YS(s, x) { return CY(x) + (3.5 - s) * SP(x); }
 
   function el(tag, attrs, parent) {
     var e = document.createElementNS(NS, tag);
@@ -35,170 +44,189 @@
     this.build();
   }
 
-  Guitar.prototype.fretX = function (n) { // posição da barra n (0 = pestana)
-    var L = (BRIDGE - NUT - 480) / (1 - Math.pow(2, -this.nF / 12));
-    // comprimento escalonado até a última casa
-    var scaleEnd = 1250;
-    var Lk = (scaleEnd - NUT) / (1 - Math.pow(2, -this.nF / 12));
-    return NUT + Lk * (1 - Math.pow(2, -n / 12));
+  Guitar.prototype.fretX = function (n) {
+    var span = NUT - 690;
+    var Lk = span / (1 - Math.pow(2, -this.nF / 12));
+    return NUT - Lk * (1 - Math.pow(2, -n / 12));
   };
   Guitar.prototype.fretCenter = function (n) {
-    if (n <= 0) return NUT - 14;
-    return (this.fretX(n - 1) + this.fretX(n)) / 2 + (n === 1 ? 2 : 0);
+    if (n <= 0) return NUT + 16;
+    return (this.fretX(n - 1) + this.fretX(n)) / 2;
   };
+  Guitar.prototype.sy = function (s, x) { return YS(s, x); };
 
   Guitar.prototype.build = function () {
-    var T = THEMES[this.voice], self = this, i, s;
+    var T = THEMES[this.voice], self = this, i, s, v = this.voice;
     this.container.innerHTML = '';
     var svg = el('svg', { viewBox: '0 0 ' + VW + ' ' + VH, width: '100%', height: '100%', preserveAspectRatio: 'xMidYMid meet' }, this.container);
-    svg.style.display = 'block';
-    this.svg = svg;
+    svg.style.display = 'block'; this.svg = svg;
     var defs = el('defs', null, svg);
-    var gr = el('radialGradient', { id: 'top' + this.voice, cx: '38%', cy: '50%', r: '75%' }, defs);
+    var gr = el('radialGradient', { id: 'top' + v, cx: '42%', cy: '45%', r: '70%' }, defs);
     el('stop', { offset: '0%', 'stop-color': T.top0 }, gr);
     el('stop', { offset: '55%', 'stop-color': T.top1 }, gr);
     el('stop', { offset: '100%', 'stop-color': T.top2 }, gr);
-    var gb = el('linearGradient', { id: 'board' + this.voice, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
-    el('stop', { offset: '0%', 'stop-color': T.board }, gb);
-    el('stop', { offset: '50%', 'stop-color': this.voice === 'aco' ? '#241e1a' : '#43291a' }, gb);
-    el('stop', { offset: '100%', 'stop-color': T.board }, gb);
-    var gp = el('linearGradient', { id: 'bg' + this.voice, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    var gp = el('linearGradient', { id: 'bg' + v, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
     el('stop', { offset: '0%', 'stop-color': T.panel }, gp);
     el('stop', { offset: '100%', 'stop-color': T.panel2 }, gp);
-    el('rect', { x: 0, y: 0, width: VW, height: VH, fill: 'url(#bg' + this.voice + ')' }, svg);
+    var gs = el('radialGradient', { id: 'glow' + v, cx: '40%', cy: '60%', r: '60%' }, defs);
+    el('stop', { offset: '0%', 'stop-color': T.accent, 'stop-opacity': 0.12 }, gs);
+    el('stop', { offset: '100%', 'stop-color': T.accent, 'stop-opacity': 0 }, gs);
+    el('rect', { x: 0, y: 0, width: VW, height: VH, fill: 'url(#bg' + v + ')' }, svg);
+    el('rect', { x: 0, y: 0, width: VW, height: VH, fill: 'url(#glow' + v + ')' }, svg);
 
-    // corpo
-    var body = this.voice === 'aco'
-      ? 'M1250,112 C1310,108 1340,50 1420,34 C1540,8 1700,10 1810,56 C1890,92 1910,160 1900,210 C1910,260 1890,328 1810,364 C1700,410 1540,412 1420,386 C1340,370 1310,312 1250,308 Z'
-      : 'M1250,118 C1300,114 1330,72 1410,52 C1520,26 1670,24 1780,64 C1860,96 1884,160 1874,210 C1884,260 1860,324 1780,356 C1670,396 1520,394 1410,368 C1330,348 1300,306 1250,302 Z';
-    el('path', { d: body, fill: T.edge, transform: 'translate(0,5)' }, svg);
-    el('path', { d: body, fill: 'url(#top' + this.voice + ')', stroke: T.edge, 'stroke-width': 6 }, svg);
-    // filetes
-    el('path', { d: body, fill: 'none', stroke: this.voice === 'aco' ? '#f5efe0' : '#3a2412', 'stroke-width': 2, opacity: 0.55, transform: 'translate(0,0) scale(0.985) translate(14,3)' }, svg);
-    // pestana do braço (cabeça)
-    var hd = this.voice === 'aco'
-      ? 'M18,150 L150,138 Q182,136 184,152 L184,268 Q182,284 150,282 L18,270 Q4,262 4,240 L4,180 Q4,158 18,150 Z'
-      : 'M10,138 L166,142 Q186,144 186,160 L186,260 Q186,276 166,278 L10,282 Q2,282 2,270 L2,150 Q2,138 10,138 Z';
-    el('path', { d: hd, fill: T.head, stroke: '#000', 'stroke-opacity': 0.35, 'stroke-width': 3 }, svg);
-    // afinadores
-    for (i = 0; i < 6; i++) {
-      var ty = this.voice === 'aco' ? SY(i + 1) : (i < 3 ? 156 + i * 26 : 218 + (i - 3) * 26 + 0);
-      var tx = this.voice === 'aco' ? 70 : 80;
-      if (this.voice === 'nylon') { ty = i < 3 ? 160 + i * 30 : 250 - (i - 3) * 30; }
-      el('circle', { cx: tx, cy: ty, r: 11, fill: '#c9c3b2', stroke: '#6d6759', 'stroke-width': 3 }, svg);
-      el('rect', { x: tx - 3, y: ty - 3, width: 56, height: 6, fill: '#cfc9b9', opacity: 0.5 }, svg);
+    /* ---- cabeça (à direita) ---- */
+    var hx0 = NUT + 4, hy = CY(NUT), hw0 = SP(NUT) * 3.3;
+    var head = v === 'aco'
+      ? 'M' + hx0 + ',' + (hy - hw0) + ' L' + (hx0 + 200) + ',' + (hy - hw0 - 24) + ' Q' + (hx0 + 262) + ',' + (hy - hw0 - 22) + ' ' + (hx0 + 266) + ',' + (hy - hw0 + 14) + ' L' + (hx0 + 266) + ',' + (hy + hw0 - 14) + ' Q' + (hx0 + 262) + ',' + (hy + hw0 + 22) + ' ' + (hx0 + 200) + ',' + (hy + hw0 + 24) + ' L' + hx0 + ',' + (hy + hw0) + ' Z'
+      : 'M' + hx0 + ',' + (hy - hw0) + ' L' + (hx0 + 210) + ',' + (hy - hw0 - 16) + ' Q' + (hx0 + 270) + ',' + (hy - hw0 - 14) + ' ' + (hx0 + 270) + ',' + (hy - hw0 + 30) + ' L' + (hx0 + 270) + ',' + (hy + hw0 - 30) + ' Q' + (hx0 + 270) + ',' + (hy + hw0 + 14) + ' ' + (hx0 + 210) + ',' + (hy + hw0 + 16) + ' L' + hx0 + ',' + (hy + hw0) + ' Z';
+    // pinos (3 + 3, como no violão clássico visto de frente)
+    for (i = 0; i < 3; i++) {
+      var px = hx0 + 70 + i * 62;
+      el('rect', { x: px - 5, y: hy - hw0 - 34, width: 10, height: 34, fill: T.peg, opacity: 0.8 }, svg);
+      el('rect', { x: px - 5, y: hy + hw0 + 2, width: 10, height: 34, fill: T.peg, opacity: 0.8 }, svg);
+      el('ellipse', { cx: px, cy: hy - hw0 - 40, rx: 17, ry: 12, fill: T.peg, stroke: '#00000055', 'stroke-width': 2 }, svg);
+      el('ellipse', { cx: px, cy: hy + hw0 + 42, rx: 17, ry: 12, fill: T.peg, stroke: '#00000055', 'stroke-width': 2 }, svg);
     }
-    // braço
-    var nTop = SY(1) - 26, nBot = SY(6) + 26;
-    el('rect', { x: NUT, y: nTop, width: this.fretX(this.nF) - NUT + 20, height: nBot - nTop, fill: 'url(#board' + this.voice + ')' }, svg);
-    el('rect', { x: this.fretX(this.nF), y: nTop + 4, width: 1250 - this.fretX(this.nF) + 20, height: nBot - nTop - 8, fill: 'url(#board' + this.voice + ')' }, svg);
-    // marcações (inlays)
+    el('path', { d: head, fill: T.head, stroke: T.bind, 'stroke-width': 3, 'stroke-opacity': 0.6 }, svg);
+    for (i = 0; i < 3; i++) {
+      el('circle', { cx: hx0 + 70 + i * 62, cy: hy - hw0 + 18, r: 8, fill: '#00000066' }, svg);
+      el('circle', { cx: hx0 + 70 + i * 62, cy: hy + hw0 - 18, r: 8, fill: '#00000066' }, svg);
+    }
+
+    /* ---- corpo (à esquerda) ---- */
+    var body = 'M800,128 C770,128 748,90 690,84 C640,80 612,108 586,122 C548,142 520,62 360,46 C230,34 110,56 66,122 C40,162 40,200 40,218 C40,236 40,274 66,314 C110,380 230,402 360,390 C520,374 548,294 586,314 C612,328 640,356 690,352 C748,346 770,308 800,308 Z';
+    el('path', { d: body, fill: T.edge, transform: 'translate(0,6)' }, svg);
+    el('path', { d: body, fill: 'url(#top' + v + ')' }, svg);
+    el('path', { d: body, fill: 'none', stroke: T.bind, 'stroke-width': 7, 'stroke-linejoin': 'round' }, svg);
+    el('path', { d: body, fill: 'none', stroke: T.edge, 'stroke-width': 2, 'stroke-opacity': 0.7, transform: 'translate(420,218) scale(0.93,0.9) translate(-420,-218)' }, svg);
+    // pescoço sob o corpo
+    var nTopX = 690;
+    // braço (madeira) e escala
+    var edge = function (x, sgn) { return CY(x) + sgn * SP(x) * 3.05; };
+    var neckPts = [[790, -1], [NUT + 6, -1], [NUT + 6, 1], [790, 1]].map(function (p) { return p[0] + ',' + edge(p[0], p[1]); }).join(' ');
+    el('polygon', { points: neckPts, fill: T.neck }, svg);
+    var fx0 = this.fretX(this.nF) - 26;
+    var boardPts = [[fx0, -1], [NUT, -1], [NUT, 1], [fx0, 1]].map(function (p) { return p[0] + ',' + edge(p[0], p[1]); }).join(' ');
+    var gb = el('linearGradient', { id: 'bd' + v, x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+    el('stop', { offset: '0%', 'stop-color': T.board }, gb);
+    el('stop', { offset: '50%', 'stop-color': v === 'aco' ? '#26201b' : '#46291a' }, gb);
+    el('stop', { offset: '100%', 'stop-color': T.board }, gb);
+    el('polygon', { points: boardPts, fill: 'url(#bd' + v + ')', stroke: '#000', 'stroke-opacity': 0.4, 'stroke-width': 2 }, svg);
+
+    // boca e rosácea
+    var hcx = 370, hcy = 216, hr = v === 'aco' ? 74 : 66;
+    el('circle', { cx: hcx, cy: hcy, r: hr, fill: T.hole }, svg);
+    T.rosette.forEach(function (c, k) { el('circle', { cx: hcx, cy: hcy, r: hr + 5 + k * 5, fill: 'none', stroke: c, 'stroke-width': 3.5 }, svg); });
+    // arabesco decorativo
+    el('path', { d: 'M262,336 C186,336 150,280 198,248 C222,232 252,246 244,270', fill: 'none', stroke: T.bind, 'stroke-width': 3, 'stroke-linecap': 'round', opacity: 0.8 }, svg);
+    if (v === 'aco') el('path', { d: 'M468,266 C520,250 572,262 590,292 C540,298 498,292 468,266 Z', fill: '#2a120a', opacity: 0.75 }, svg);
+    // cavalete
+    var bx = BRIDGE;
+    var by1 = YS(6, bx) - 36, by2 = YS(1, bx) + 36;
+    el('rect', { x: bx - 26, y: by1, width: 46, height: by2 - by1, rx: 10, fill: T.bridge }, svg);
+    el('rect', { x: bx - 8, y: by1 + 8, width: 10, height: by2 - by1 - 16, rx: 5, fill: '#f3e9cf', opacity: 0.3 }, svg);
+    for (s = 1; s <= 6; s++) el('circle', { cx: bx - 12, cy: YS(s, bx), r: 4.2, fill: v === 'aco' ? '#f0e8d8' : '#e8dcc0' }, svg);
+
+    // marcações (inlays) e trastes
     [3, 5, 7, 9, 12, 15].forEach(function (n) {
       if (n > self.nF) return;
-      var cx = self.fretCenter(n), cy = 210;
-      if (n === 12) { el('circle', { cx: cx, cy: cy - 52, r: 9, fill: T.inlay, opacity: 0.85 }, svg); el('circle', { cx: cx, cy: cy + 52, r: 9, fill: T.inlay, opacity: 0.85 }, svg); }
-      else el('circle', { cx: cx, cy: cy, r: 10, fill: T.inlay, opacity: 0.85 }, svg);
+      var cx = self.fretCenter(n), cy = CY(cx);
+      if (n === 12) { el('circle', { cx: cx, cy: cy - SP(cx) * 1.1, r: 6.5, fill: T.inlay, opacity: 0.9 }, svg); el('circle', { cx: cx, cy: cy + SP(cx) * 1.1, r: 6.5, fill: T.inlay, opacity: 0.9 }, svg); }
+      else el('circle', { cx: cx, cy: cy, r: 7, fill: T.inlay, opacity: 0.9 }, svg);
     });
-    // traste
-    el('rect', { x: NUT - 8, y: nTop - 2, width: 10, height: nBot - nTop + 4, fill: T.nut, rx: 3 }, svg);
-    for (i = 1; i <= this.nF; i++) el('rect', { x: this.fretX(i) - 2.2, y: nTop, width: 4.4, height: nBot - nTop, fill: T.fret, opacity: 0.9 }, svg);
-    // números das casas
+    el('line', { x1: NUT, x2: NUT, y1: edge(NUT, -1) - 1, y2: edge(NUT, 1) + 1, stroke: T.nut, 'stroke-width': 11, 'stroke-linecap': 'round' }, svg);
     for (i = 1; i <= this.nF; i++) {
-      el('text', { x: this.fretCenter(i), y: nBot + 30, 'text-anchor': 'middle', 'font-family': 'Trebuchet MS,Verdana,sans-serif', 'font-size': 22, fill: T.label, opacity: 0.75 }, svg).textContent = i;
+      var fxx = this.fretX(i);
+      el('line', { x1: fxx, x2: fxx, y1: edge(fxx, -1), y2: edge(fxx, 1), stroke: T.fret, 'stroke-width': 3.4, opacity: 0.9 }, svg);
     }
-    // boca
-    var hx = 1545, hy = 210;
-    el('circle', { cx: hx, cy: hy, r: this.voice === 'aco' ? 78 : 70, fill: T.hole }, svg);
-    var rr = this.voice === 'aco' ? 78 : 70;
-    T.rosette.forEach(function (c, k) { el('circle', { cx: hx, cy: hy, r: rr + 6 + k * 5, fill: 'none', stroke: c, 'stroke-width': 4 }, svg); });
-    if (this.voice === 'aco') { // escudo (pickguard)
-      el('path', { d: 'M1478,330 C1560,352 1650,330 1690,282 C1640,300 1560,308 1478,300 Z', fill: '#2a120a', opacity: 0.8 }, svg);
+    // números das casas — acima do braço, como no modelo
+    for (i = 1; i <= this.nF; i++) {
+      var cxn = this.fretCenter(i);
+      var strong = [3, 5, 7, 9, 12, 15].indexOf(i) >= 0;
+      el('text', { x: cxn, y: edge(cxn, -1) - 12, 'text-anchor': 'middle', 'font-family': 'Trebuchet MS,Verdana,sans-serif', 'font-size': strong ? 24 : 18, 'font-weight': strong ? 'bold' : 'normal', fill: T.label, opacity: strong ? 0.9 : 0.5 }, svg).textContent = i;
     }
-    // cavalete
-    if (this.voice === 'aco') {
-      el('rect', { x: BRIDGE - 18, y: SY(1) - 34, width: 34, height: SY(6) - SY(1) + 68, rx: 10, fill: T.bridge }, svg);
-      for (s = 1; s <= 6; s++) el('circle', { cx: BRIDGE - 22, cy: SY(s), r: 5, fill: '#f0e8d8' }, svg);
-    } else {
-      el('rect', { x: BRIDGE - 26, y: SY(1) - 40, width: 56, height: SY(6) - SY(1) + 80, rx: 12, fill: T.bridge }, svg);
-      el('rect', { x: BRIDGE + 4, y: SY(1) - 30, width: 18, height: SY(6) - SY(1) + 60, rx: 8, fill: '#e8dcc0', opacity: 0.35 }, svg);
-    }
-    // linha de ponteio
-    this.pluckX = 1672;
-    el('line', { x1: this.pluckX, x2: this.pluckX, y1: SY(1) - 30, y2: SY(6) + 30, stroke: T.accent, 'stroke-width': 2, 'stroke-dasharray': '6 8', opacity: 0.45 }, svg);
+
+    // linha de ponteio (mão direita) entre a boca e o braço
+    this.pluckX = 590;
+    el('line', { x1: this.pluckX, x2: this.pluckX, y1: YS(6, this.pluckX) - 30, y2: YS(1, this.pluckX) + 30, stroke: T.accent, 'stroke-width': 2, 'stroke-dasharray': '6 8', opacity: 0.4 }, svg);
 
     // cordas
-    this.strPath = [];
+    this.strPath = []; this.vib = [];
+    var tailX = NUT + 120;
     for (s = 1; s <= 6; s++) {
       var wound = s >= 4;
-      var w = (this.voice === 'aco' ? [1.3, 1.7, 2.3, 3.0, 3.8, 4.6] : [2.4, 2.8, 3.3, 3.4, 3.9, 4.4])[s - 1];
+      var w = (v === 'aco' ? [1.4, 1.8, 2.4, 3.1, 3.9, 4.7] : [2.4, 2.8, 3.3, 3.4, 3.9, 4.4])[s - 1];
       var col = wound ? T.woundStr : T.trebleStr;
-      var p = el('path', { d: 'M' + NUT + ',' + SY(s) + ' L' + BRIDGE + ',' + SY(s), stroke: col, 'stroke-width': w, fill: 'none', 'stroke-linecap': 'round', opacity: this.voice === 'nylon' && !wound ? 0.82 : 1 }, svg);
+      el('line', { x1: NUT, x2: tailX, y1: YS(s, NUT), y2: YS(s, NUT) + (3.5 - s) * 2, stroke: col, 'stroke-width': Math.max(1.2, w * 0.7), opacity: 0.8 }, svg);
+      var p = el('path', { d: this.line(s), stroke: col, 'stroke-width': w, fill: 'none', 'stroke-linecap': 'round', opacity: (v === 'nylon' && !wound) ? 0.85 : 1 }, svg);
       this.strPath[s] = p;
-      if (wound) el('path', { d: 'M' + NUT + ',' + SY(s) + ' L' + BRIDGE + ',' + SY(s), stroke: '#000', 'stroke-width': 0.8, 'stroke-dasharray': '2 3', opacity: 0.35, fill: 'none' }, svg);
-      el('text', { x: 205 - 30, y: SY(s) + 7, 'text-anchor': 'middle', 'font-family': 'Trebuchet MS,Verdana,sans-serif', 'font-size': 20, fill: T.label, opacity: 0.0 }, svg);
+      if (wound) el('path', { d: this.line(s), stroke: '#000', 'stroke-width': 0.8, 'stroke-dasharray': '2 3', opacity: 0.35, fill: 'none' }, svg);
+      el('text', { x: NUT + 26, y: YS(s, NUT) + 6, 'font-family': 'Trebuchet MS,Verdana,sans-serif', 'font-size': 19, 'font-weight': 'bold', fill: T.label, opacity: 0.85 }, svg).textContent = LABELS[s];
     }
     // pestana (barre)
-    this.barre = el('rect', { x: 0, y: 0, width: 0, height: 0, rx: 18, fill: LF_COL[1], opacity: 0 }, svg);
-    this.barre.style.transition = 'opacity .1s';
+    this.barre = el('rect', { x: 0, y: 0, width: 0, height: 0, rx: 16, fill: LF_COL[1], opacity: 0 }, svg);
 
-    // dedos mão esquerda
+    // dedos da mão esquerda
     this.lf = {};
     for (i = 1; i <= 4; i++) {
       var g = el('g', { opacity: 0 }, svg);
       g.style.transition = 'transform .1s ease-out, opacity .08s';
-      el('circle', { r: 19, fill: LF_COL[i], stroke: '#fff', 'stroke-width': 3 }, g);
-      var t = el('text', { y: 8, 'text-anchor': 'middle', 'font-family': 'Trebuchet MS,Verdana,sans-serif', 'font-size': 24, 'font-weight': 'bold', fill: '#fff' }, g);
+      el('circle', { r: 17, fill: LF_COL[i], stroke: '#fff', 'stroke-width': 3 }, g);
+      var t = el('text', { y: 8, 'text-anchor': 'middle', 'font-family': 'Trebuchet MS,Verdana,sans-serif', 'font-size': 22, 'font-weight': 'bold', fill: '#fff' }, g);
       t.textContent = i;
       this.lf[i] = g;
     }
-    // marcas de ponteio por corda (mão direita)
+    // marcas do ponteio por corda
     this.rfMark = [];
     for (s = 1; s <= 6; s++) {
-      var gm = el('g', { opacity: 0, transform: 'translate(' + this.pluckX + ',' + SY(s) + ')' }, svg);
-      el('circle', { r: 20, fill: '#fff', stroke: '#000', 'stroke-opacity': 0.4, 'stroke-width': 2 }, gm);
-      var tt = el('text', { y: 9, 'text-anchor': 'middle', 'font-family': 'Georgia,serif', 'font-style': 'italic', 'font-size': 28, 'font-weight': 'bold', fill: '#fff' }, gm);
+      var gm = el('g', { opacity: 0 }, svg);
+      el('circle', { r: 19, fill: '#fff', stroke: '#000', 'stroke-opacity': 0.4, 'stroke-width': 2 }, gm);
+      var tt = el('text', { y: 9, 'text-anchor': 'middle', 'font-family': 'Georgia,serif', 'font-style': 'italic', 'font-size': 26, 'font-weight': 'bold', fill: '#fff' }, gm);
       this.rfMark[s] = { g: gm, t: tt, c: gm.firstChild };
     }
-    // legenda mão direita (p i m a)
+    // legenda
     this.rfLeg = {};
+    el('text', { x: 40, y: 38, 'font-family': 'Trebuchet MS,Verdana,sans-serif', 'font-size': 20, fill: T.label, opacity: 0.85 }, svg).textContent = 'Mão direita';
     ['p', 'i', 'm', 'a'].forEach(function (f, k) {
-      var gx = 1500 + k * 90, gy = 400 - 26;
-      var gg = el('g', { transform: 'translate(' + (1790 - 3 * 78 + k * 78 - 20) + ',46)' }, svg);
-      var c = el('circle', { r: 21, fill: RF_COL[f], opacity: 0.35, stroke: '#fff', 'stroke-width': 2 }, gg);
-      var tx = el('text', { y: 9, 'text-anchor': 'middle', 'font-family': 'Georgia,serif', 'font-style': 'italic', 'font-size': 28, 'font-weight': 'bold', fill: '#fff' }, gg);
+      var gg = el('g', { transform: 'translate(' + (190 + k * 54) + ',32)' }, svg);
+      var c = el('circle', { r: 20, fill: RF_COL[f], opacity: 0.3, stroke: '#fff', 'stroke-width': 2 }, gg);
+      var tx = el('text', { y: 9, 'text-anchor': 'middle', 'font-family': 'Georgia,serif', 'font-style': 'italic', 'font-size': 26, 'font-weight': 'bold', fill: '#fff' }, gg);
       tx.textContent = f;
-      self.rfLeg[f] = { c: c, g: gg };
+      self.rfLeg[f] = { c: c, g: gg, k: k };
     });
-    el('text', { x: 1790 - 3 * 78 - 20 - 34, y: 56, 'text-anchor': 'end', 'font-family': 'Trebuchet MS,Verdana,sans-serif', 'font-size': 20, fill: T.label, opacity: 0.8 }, svg).textContent = 'Mão direita';
-    el('text', { x: NUT + 4, y: 40, 'font-family': 'Trebuchet MS,Verdana,sans-serif', 'font-size': 20, fill: T.label, opacity: 0.8 }, svg).textContent = 'Mão esquerda (números = dedos)';
-    this.capoEl = el('rect', { x: 0, y: nTop - 10, width: 20, height: nBot - nTop + 20, rx: 8, fill: '#8c8c8c', stroke: '#444', 'stroke-width': 2, opacity: 0 }, svg);
-    this.vib = [];
-    this.nTop = nTop; this.nBot = nBot;
-    this.lastKey = '';
+    el('text', { x: 1560, y: 38, 'text-anchor': 'end', 'font-family': 'Trebuchet MS,Verdana,sans-serif', 'font-size': 20, fill: T.label, opacity: 0.85 }, svg).textContent = 'Mão esquerda (números = dedos)';
+    this.capoEl = el('rect', { x: 0, y: 0, width: 22, height: 10, rx: 8, fill: '#9a9a9a', stroke: '#444', 'stroke-width': 2, opacity: 0 }, svg);
+  };
+
+  Guitar.prototype.line = function (s) {
+    return 'M' + BRIDGE + ',' + YS(s, BRIDGE) + ' L' + NUT + ',' + YS(s, NUT);
   };
 
   Guitar.prototype.setCapo = function (c) {
-    if (c > 0) { var x = this.fretX(Math.min(c, this.nF)) - 14; this.capoEl.setAttribute('x', x); this.capoEl.setAttribute('opacity', 0.9); }
-    else this.capoEl.setAttribute('opacity', 0);
+    if (c > 0) {
+      var x = this.fretX(Math.min(c, this.nF)) + 10;
+      var y1 = CY(x) - SP(x) * 3.3, y2 = CY(x) + SP(x) * 3.3;
+      this.capoEl.setAttribute('x', x - 11); this.capoEl.setAttribute('y', y1); this.capoEl.setAttribute('height', y2 - y1); this.capoEl.setAttribute('opacity', 0.92);
+    } else this.capoEl.setAttribute('opacity', 0);
   };
 
-  /* estado da mão esquerda */
   Guitar.prototype.setHeld = function (st) {
-    var key = st ? st.t + ':' + st.held.length : '';
     var used = {}, i, h;
     if (st) {
       for (i = 0; i < st.held.length; i++) {
         h = st.held[i];
         var g = this.lf[h.n]; if (!g) continue;
         used[h.n] = true;
-        g.style.transform = 'translate(' + this.fretCenter(h.f) + 'px,' + SY(h.s) + 'px)';
+        var x = this.fretCenter(h.f), y = YS(h.s, x);
+        g.style.transform = 'translate(' + x + 'px,' + y + 'px)';
         g.setAttribute('opacity', 1);
-        g.firstChild.setAttribute('r', h.mel ? 21 : 19);
+        var r = Math.min(19, SP(x) * 0.58) * (h.mel ? 1.1 : 1);
+        g.firstChild.setAttribute('r', r.toFixed(1));
       }
       if (st.barre) {
-        var b = st.barre, x1 = this.fretX(b.f - 1) + 4, x2 = this.fretX(b.f) - 4;
-        var y1 = SY(b.s1) - 19, y2 = SY(b.s2) + 19;
-        this.barre.setAttribute('x', (x1 + x2) / 2 - 17); this.barre.setAttribute('width', 34);
+        var b = st.barre, xm = this.fretCenter(b.f);
+        var y1 = YS(b.s2, xm) - 15, y2 = YS(b.s1, xm) + 15;
+        this.barre.setAttribute('x', xm - 14); this.barre.setAttribute('width', 28);
         this.barre.setAttribute('y', y1); this.barre.setAttribute('height', y2 - y1);
         this.barre.setAttribute('opacity', 0.9);
       } else this.barre.setAttribute('opacity', 0);
@@ -206,42 +234,38 @@
     for (i = 1; i <= 4; i++) if (!used[i]) this.lf[i].setAttribute('opacity', 0);
   };
 
-  /* chamado a cada quadro: plucks = [{s,hand,age}] (age em segundos) */
   Guitar.prototype.frame = function (st, plucks, now) {
     this.setHeld(st);
-    var s, amp = {}, active = {}, strActive = {};
-    var k;
+    var s, amp = {}, active = {}, strActive = {}, k;
     for (k = 0; k < plucks.length; k++) {
       var p = plucks[k];
       if (!(p.s in amp) || p.age < amp[p.s].age) amp[p.s] = { age: p.age, hand: p.hand };
       if (p.age < 0.22) { active[p.hand] = 1; strActive[p.s] = p; }
     }
     for (s = 1; s <= 6; s++) {
-      var a = amp[s], d;
-      var y = SY(s);
+      var a = amp[s];
       if (a && a.age < 1.6) {
-        var A = 9 * Math.exp(-a.age * 3.2) * Math.sin(a.age * 2 * Math.PI * (14 + s * 1.5));
-        var xm = (this.pluckX + NUT) / 2 + 260;
-        d = 'M' + NUT + ',' + y + ' Q' + xm + ',' + (y + A) + ' ' + BRIDGE + ',' + y;
-        this.strPath[s].setAttribute('d', d);
+        var A = 8 * Math.exp(-a.age * 3.2) * Math.sin(a.age * 2 * Math.PI * (14 + (7 - s) * 1.5));
+        var mx = (this.pluckX + BRIDGE) / 2 + 150, my = (YS(s, mx)) + A;
+        this.strPath[s].setAttribute('d', 'M' + BRIDGE + ',' + YS(s, BRIDGE) + ' Q' + mx + ',' + my + ' ' + NUT + ',' + YS(s, NUT));
         this.vib[s] = true;
       } else if (this.vib[s]) {
-        this.strPath[s].setAttribute('d', 'M' + NUT + ',' + y + ' L' + BRIDGE + ',' + y);
+        this.strPath[s].setAttribute('d', this.line(s));
         this.vib[s] = false;
       }
-      var m = this.rfMark[s];
-      var pk = strActive[s];
+      var m = this.rfMark[s], pk = strActive[s];
       if (pk) {
         var sc = 1 + 0.25 * (1 - pk.age / 0.22);
-        m.g.setAttribute('transform', 'translate(' + this.pluckX + ',' + y + ') scale(' + sc.toFixed(2) + ')');
+        m.g.setAttribute('transform', 'translate(' + this.pluckX + ',' + YS(s, this.pluckX) + ') scale(' + sc.toFixed(2) + ')');
         m.g.setAttribute('opacity', Math.min(1, 1.2 - pk.age * 3));
         m.c.setAttribute('fill', RF_COL[pk.hand]);
         m.t.textContent = pk.hand;
       } else m.g.setAttribute('opacity', 0);
     }
     for (var f in this.rfLeg) {
-      this.rfLeg[f].c.setAttribute('opacity', active[f] ? 1 : 0.3);
-      this.rfLeg[f].g.setAttribute('transform', this.rfLeg[f].g.getAttribute('transform').replace(/scale\([^)]*\)/, '') + (active[f] ? ' scale(1.15)' : ''));
+      var L = this.rfLeg[f];
+      L.c.setAttribute('opacity', active[f] ? 1 : 0.3);
+      L.g.setAttribute('transform', 'translate(' + (190 + L.k * 54) + ',32)' + (active[f] ? ' scale(1.18)' : ''));
     }
   };
 
