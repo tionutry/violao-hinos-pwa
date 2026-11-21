@@ -97,15 +97,23 @@
     return out;
   }
 
+  // Reverb de sala/igreja: pré-atraso, reflexões iniciais e cauda que escurece com o tempo
   function makeImpulse(ctx, secs, decay) {
-    var sr = ctx.sampleRate, len = Math.floor(sr * secs);
+    var sr = ctx.sampleRate, len = Math.floor(sr * secs), pre = Math.floor(sr * 0.016);
     var ir = ctx.createBuffer(2, len, sr);
+    var early = [0.021, 0.033, 0.047, 0.062, 0.081, 0.104];
     for (var c = 0; c < 2; c++) {
-      var d = ir.getChannelData(c), r = rng(1234 + c * 77), lp = 0;
-      for (var i = 0; i < len; i++) {
-        lp = 0.6 * lp + 0.4 * r();
-        d[i] = lp * Math.pow(1 - i / len, decay) * (i < 200 ? i / 200 : 1);
+      var d = ir.getChannelData(c), r = rng(1234 + c * 77), lp = 0, i;
+      for (i = pre; i < len; i++) {
+        var u = (i - pre) / (len - pre);
+        var k = 0.62 - 0.5 * Math.min(1, u * 2.2); // coeficiente do passa-baixas: agudos somem primeiro
+        lp = k * lp + (1 - k) * r();
+        d[i] = lp * Math.pow(1 - u, decay) * (i - pre < 400 ? (i - pre) / 400 : 1) * 1.6;
       }
+      early.forEach(function (t, q) {
+        var p = Math.floor(sr * (t + c * 0.0035));
+        if (p < len) d[p] += (q % 2 ? -1 : 1) * 0.55 * Math.pow(0.82, q);
+      });
     }
     return ir;
   }
@@ -125,8 +133,8 @@
     this.f3 = ctx.createBiquadFilter(); this.f3.type = 'highshelf';
     this.comp = ctx.createDynamicsCompressor();
     this.comp.threshold.value = -16; this.comp.knee.value = 18; this.comp.ratio.value = 3; this.comp.attack.value = 0.005; this.comp.release.value = 0.25;
-    this.master = ctx.createGain(); this.master.gain.value = 0.9;
-    this.rev = ctx.createConvolver(); this.irs = { aco: makeImpulse(ctx, 1.4, 2.6), nylon: makeImpulse(ctx, 2.6, 2.0) }; this.rev.buffer = this.irs.aco;
+    this.master = ctx.createGain(); this.master.gain.value = 0.8;
+    this.rev = ctx.createConvolver(); this.irs = { aco: makeImpulse(ctx, 2.6, 2.4), nylon: makeImpulse(ctx, 3.8, 1.8) }; this.rev.buffer = this.irs.aco;
     this.wet = ctx.createGain(); this.dry = ctx.createGain();
     this.bus.connect(this.f1); this.f1.connect(this.f2); this.f2.connect(this.f3); this.f3.connect(this.comp);
     this.comp.connect(this.dry); this.comp.connect(this.rev); this.rev.connect(this.wet);
@@ -141,12 +149,12 @@
       this.f1.frequency.value = 110; this.f1.gain.value = 3.5; this.f1.Q.value = 1.1;
       this.f2.frequency.value = 2600; this.f2.gain.value = 2.5; this.f2.Q.value = 0.9;
       this.f3.frequency.value = 6000; this.f3.gain.value = 1.5;
-      this.wet.gain.value = 0.16; this.dry.gain.value = 0.95;
+      this.wet.gain.value = 0.55; this.dry.gain.value = 0.85;
     } else {
       this.f1.frequency.value = 95; this.f1.gain.value = 3.5; this.f1.Q.value = 1.2;
       this.f2.frequency.value = 210; this.f2.gain.value = 2.0; this.f2.Q.value = 1.0;
       this.f3.frequency.value = 4500; this.f3.gain.value = -3.5;
-      this.wet.gain.value = 0.36; this.dry.gain.value = 0.9;
+      this.wet.gain.value = 0.8; this.dry.gain.value = 0.82;
     }
   };
   Synth.prototype.buffer = function (midi, mode) {
